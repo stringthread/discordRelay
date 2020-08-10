@@ -1,6 +1,7 @@
 const Discord = require("discord.js");
 const fs = require('fs');
-const {Readable}=require('stream')
+const {Readable}=require('stream');
+const process=require('process')
 
 const client_in = new Discord.Client();
 const client_out = new Discord.Client();
@@ -93,5 +94,5 @@ client_out.on('message', msg => {
   }
 });
 
-client_in.login(config.token_in);
-client_out.login(config.token_out);
+client_in.login(process.env.DISCORD_TOKEN_IN);
+client_out.login(process.env.DISCORD_TOKEN_OUT);
