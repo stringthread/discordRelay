@@ -1,0 +1,5 @@
+{
+  "prefix" : "?relay_",
+  "token_in" : "Token for Relay Input Bot",
+  "token_out" : "Token for Relay Output Bot"
+}
