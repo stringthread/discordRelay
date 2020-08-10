@@ -94,5 +94,6 @@ client_out.on('message', msg => {
   }
 });
 
+console.log(process.env.DISCORD_TOKEN_IN);
 client_in.login(process.env.DISCORD_TOKEN_IN);
 client_out.login(process.env.DISCORD_TOKEN_OUT);
