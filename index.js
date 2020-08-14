@@ -146,4 +146,4 @@ class Unit{
   }
 }
 
-var unit=[...Array(env.NUM_BOTS)].map((_, i) => new Unit(i));
+var unit=[...Array(parseInt(env.NUM_BOTS))].map((_, i) => new Unit(i));
