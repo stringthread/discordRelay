@@ -4,7 +4,8 @@ const {Readable}=require('stream');
 const {env}=require('process');
 const config = require('./auth.json');
 require('dotenv').config();
-const num_bots= parseInt(env.NUM_BOTS)
+const num_bots= parseInt(env.NUM_BOTS);
+const num_outs=parseInt(env.NUM_OUTS);
 
 class Silence extends Readable{
   _read(){this.push(Buffer.from([0xF8,0xFF,0xFE]))}
@@ -45,7 +46,7 @@ class Unit{
         if(!(user&&speaking)) return;
         if (speaking && !this.in_user_ids.has(user.id)) {
           // this creates a 16-bit signed PCM, stereo 48KHz PCM stream.
-          var n=(this.in_audioStream[0]?(this.in_audioStream[1]?-1:1):0)
+          var n=this.in_audioStream.findIndex(v=>!v);
           console.log(`Speaking-${n}: ${user}`)
           if(n==-1){
             console.log('too many people speaking.');
@@ -145,15 +146,15 @@ class Unit{
   constructor(id){
     this.id=id
     this.client_in = new Discord.Client();
-    this.clients_out = [new Discord.Client(), new Discord.Client()];
+    this.clients_out = [...Array(num_outs)].map(_=>new Discord.Client());
 
     this.token_in=env["DISCORD_TOKEN_IN_"+(this.id+1)];
-    this.tokens_out=[env["DISCORD_TOKEN_OUT_1_"+(this.id+1)], env["DISCORD_TOKEN_OUT_2_"+(this.id+1)]];
+    this.tokens_out=[...Array(num_outs)].map((_,i)=>env[`DISCORD_TOKEN_OUT_${i+1}_${this.id+1}`]);
 
-    this.in_audioStream=[null,null];
+    this.in_audioStream=[...Array(num_outs)];
     this.in_user_ids=new Set();
     this.in_conn=null;
-    this.out_conn=[null,null];
+    this.out_conn=[...Array(num_outs)];
     this.fn=[this.fn_in,this.fn_out];
 
     /*this.client_in.on('message', msg => {
@@ -270,7 +271,7 @@ class UnitManager{
       msg.reply('Bots all used...');
       return;
     }
-    this.channels[i][0]=v_ch.id;
+    this.channels[i][in_out]=v_ch.id;
     if(!set_conn) this.ch2bots.set(v_ch.id,new Set());
     this.ch2bots.get(v_ch.id).add(2*i+in_out);
     this.units[i].fn[in_out](msg,msg.guild.id,v_ch.id);
