@@ -10,6 +10,7 @@
   "license": "MIT",
   "dependencies": {
     "@discordjs/opus": "^0.3.2",
+    "audio-mixer": "^2.1.4",
     "audiosprite": "^0.7.2",
     "discord.js": "^12.2.0",
     "dotenv": "^8.2.0"
