@@ -15,34 +15,52 @@ class Silence extends Readable{
 class MixStream extends EventEmitter{
   constructor(rs_list=[]){
     super();
-    this.mixer = new Mixer.Mixer({
+    this._mixer = new Mixer.Mixer({
       channels: 2,
       bitDepth: 16,
       sampleRate: 48000,
       clearInterval: 250,
       autoDestroy: false
-    });
+    }).resume();
     for (var i = 0; i < rs_list.length; i++) {
       this.add_rs(rs_list[i]);
     }
   }
-  add_rs(rs){
-    var new_in=this.mixer.input({})
+  add_rs=(rs)=>{
+    var new_in=this._mixer.input({});
     rs.on('end',(()=>{
-      this.mixer.removeInput(new_in);
-      //if(this.mixer.inputs.length==0) this.close();
+      this._mixer.removeInput(new_in);
+      //if(this._mixer.inputs.length==0) this.close();
     }).bind(this))
     .on('close',(()=>{
-      this.mixer.removeInput(new_in);
-      //if(this.mixer.inputs.length==0) this.close();
+      this._mixer.removeInput(new_in);
+      //if(this._mixer.inputs.length==0) this.close();
     }).bind(this))
     .pipe(new_in);
   }
-  close(){
-    this.mixer.unpipe();
-    this.mixer.close();
-    this.mixer.destroy();
-    this.emit('close');
+  close=(flg_close=true)=>{
+    this._mixer.unpipe();
+    this._mixer.close();
+    this._mixer.destroy();
+    if(flg_close) this.emit('close');
+  }
+  get mixer(){
+    return this._mixer.resume();
+  }
+  reconnect=()=>{
+    var inputs=this._mixer.inputs.concat();
+    this.close(false);
+    this._mixer = new Mixer.Mixer({
+      channels: 2,
+      bitDepth: 16,
+      sampleRate: 48000,
+      clearInterval: 250,
+      autoDestroy: false
+    }).resume();
+    inputs.forEach(i=>{
+      this._mixer.addInput(i);
+      console.log(i);
+    });
   }
 }
 
@@ -76,9 +94,9 @@ class Unit{
               this.mix_stream.get(g_id).on('close',()=>this.mix_stream.delete(g_id));
               if(this.out_conn.has(g_id)) this.out_conn.get(g_id).play(this.mix_stream.get(g_id).mixer,{type:'converted'});
             }
-            rs.on('end', () => {
+            rs.on('end', (() => {
               this.in_user_ids.get(g_id).delete(user.id);
-            });
+            }).bind(this));
           }catch(e){console.log(e)}
         }
       });
@@ -94,22 +112,23 @@ class Unit{
     let v_ch=guild.channels.cache.get(ch_id);
     v_ch.join()
     .then(conn => {
-      msg.reply('ready!');
       this.out_conn.set(g_id,conn);
       conn.on('disconnect',()=>{
         if(this.out_conn.has(g_id)) this.out_conn.delete(g_id);
       });
-      if(!this.mix_stream.has(g_id)){
-        this.mix_stream.set(g_id,new MixStream());
-        this.mix_stream.get(g_id).on('close',()=>this.mix_stream.delete(g_id));
-      }
+      if(this.mix_stream.has(g_id)){this.mix_stream.get(g_id).close();}
+      this.mix_stream.set(g_id,new MixStream());
+      this.mix_stream.get(g_id).on('close',(()=>this.mix_stream.delete(g_id)).bind(this));
       this.out_conn.get(g_id).play(this.mix_stream.get(g_id).mixer,{type:'converted'});
     })
     .catch(console.log);
   };
   fn_leave=(msg,flg_out,g_id)=>{
     if(flg_out){
-      if(this.out_conn.has(g_id)) this.out_conn.get(g_id).disconnect();
+      if(this.out_conn.has(g_id)){
+        this.out_conn.get(g_id).disconnect();
+        //this.out_conn.delete(g_id);
+      }
     }else{
       if(this.in_conn.has(g_id)) this.in_conn.get(g_id).disconnect();
       this.in_conn.delete(g_id);
