@@ -92,7 +92,7 @@ class Unit{
             }else{
               this.mix_stream.set(g_id,new MixStream([rs]));
               this.mix_stream.get(g_id).on('close',()=>this.mix_stream.delete(g_id));
-              if(this.out_conn.has(g_id)) this.out_conn.get(g_id).play(this.mix_stream.get(g_id).mixer,{type:'converted'});
+              if(this.out_conn.has(g_id)) this.dispatchers.set(g_id, this.out_conn.get(g_id).play(this.mix_stream.get(g_id).mixer,{type:'converted',volume: this.vol.has(g_id)?this.vol.get(g_id):1}));
             }
             rs.on('end', (() => {
               this.in_user_ids.get(g_id).delete(user.id);
@@ -119,7 +119,7 @@ class Unit{
       if(this.mix_stream.has(g_id)){this.mix_stream.get(g_id).close();}
       this.mix_stream.set(g_id,new MixStream());
       this.mix_stream.get(g_id).on('close',(()=>this.mix_stream.delete(g_id)).bind(this));
-      this.out_conn.get(g_id).play(this.mix_stream.get(g_id).mixer,{type:'converted'});
+      this.dispatchers.set(g_id,this.out_conn.get(g_id).play(this.mix_stream.get(g_id).mixer,{type:'converted',volume: this.vol.has(g_id)?this.vol.get(g_id):1}));
     })
     .catch(console.log);
   };
@@ -129,6 +129,7 @@ class Unit{
         this.out_conn.get(g_id).disconnect();
         //this.out_conn.delete(g_id);
       }
+      if(this.vol.has(g_id))this.vol.delete(g_id,);
     }else{
       if(this.in_conn.has(g_id)) this.in_conn.get(g_id).disconnect();
       this.in_conn.delete(g_id);
@@ -139,9 +140,13 @@ class Unit{
       }
     }
   };
+  fn_vol=(msg,vol,g_id)=>{
+    if(this.dispatchers.has(g_id)) this.dispatchers.get(g_id).setVolume(vol);
+    this.vol.set(vol);
+  };
 
   constructor(id){
-    this.id=id
+    this.id=id;
     this.client_in = new Discord.Client();
     this.client_out = new Discord.Client();
 
@@ -149,9 +154,11 @@ class Unit{
     this.token_out=env[`DISCORD_TOKEN_OUT_1_${this.id+1}`];
 
     this.mix_stream=new Map();//guild->MixStream
+    this.vol=new Map();//guild->Number (volume)
     this.in_user_ids=new Map();//guild->Set<user_id>
     this.in_conn=new Map();//guild->in_conn
     this.out_conn=new Map();//guild->out_conn
+    this.dispatchers=new Map();//guild->StreamDispatcher
     this.fn=[this.fn_in,this.fn_out];
 
     this.client_in.login(this.token_in);
@@ -186,6 +193,24 @@ class UnitManager{
         this.units[Math.floor(i/2)].fn_leave(msg,i%2,msg.guild.id);
         this.channels[Math.floor(i/2)][i%2]=0;
         this.ch2bots.get(v_ch.id).delete(i);
+      }
+    }else if(msg.content.startsWith(config.prefix+'vol')){
+      let [command, ...args]=msg.content.split(" ");
+      let vol=args.pop();
+      if(!isFinite(vol)){
+        return msg.reply('Argument vol is not a number. Usage: ?relay_vol [ch_name(string)] [volume(number)]');
+      }
+      vol=parseInt(vol)/100;
+      if (!msg.guild) {
+        return msg.reply('no private service is available in your area at the moment. Please contact a service representative for more details.');
+      }
+      const v_ch = msg.guild.channels.cache.find(ch => ch.name === args.join(" "));
+      if (!v_ch || v_ch.type !== 'voice') {
+        return msg.reply(`I couldn't find the channel ${args}. Can you spell?`);
+      }
+      if(!this.ch2bots.has(v_ch.id)) return;
+      for(let i of this.ch2bots.get(v_ch.id)){
+        this.units[Math.floor(i/2)].fn_vol(msg,vol,msg.guild.id);
       }
     }
   };
